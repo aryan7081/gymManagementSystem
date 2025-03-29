@@ -30,13 +30,23 @@ class MembershipPlan(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_duration_display()}) - ₹{self.price}"
     
+    def get_duration_days(self):
+        """Convert membership duration to days."""
+        duration_map = {
+            'monthly': 30,
+            'quarterly': 90,
+            'half_yearly': 180,
+            'annual': 365,
+        }
+        return duration_map.get(self.duration, 30)
+    
 
 class Membership(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     plan = models.ForeignKey(MembershipPlan, on_delete=models.SET_NULL, null=True)
     start_date = models.DateField(default = now)
     end_date = models.DateField()
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.username} - {self.plan.name} (Active: {self.is_active})"

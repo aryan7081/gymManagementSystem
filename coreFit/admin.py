@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser
+from .models import CustomUser, Payment, Membership,MembershipPlan
 from django.contrib.admin import AdminSite
 from .forms import CustomAdminAuthenticationForm
 from django.contrib.auth.models import Group
@@ -14,5 +14,30 @@ admin_site.register(Group)
 admin_site.register(Token)
 
 admin_site.register(CustomUser)
+
+class MembershipPlanAdmin(admin.ModelAdmin):
+    list_display = ('name', 'duration', 'price', 'is_active', 'created_at')
+    search_fields = ('name',)
+    list_filter = ('is_active', 'duration')
+    ordering = ('-created_at',)
+admin_site.register(MembershipPlan, MembershipPlanAdmin)
+
+
+class MembershipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'plan', 'start_date', 'end_date', 'is_active')
+    search_fields = ('user__username', 'plan__name')
+    list_filter = ('is_active', 'plan')
+    ordering = ('-start_date',)
+
+admin_site.register(Membership, MembershipAdmin)
+
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('user', 'membership', 'amount', 'status', 'payment_method', 'created_at')
+    search_fields = ('user__username', 'transaction_id')
+    list_filter = ('status', 'payment_method')
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at', 'updated_at')
+
+admin_site.register(Payment, PaymentAdmin)
 
 # Register your models here.

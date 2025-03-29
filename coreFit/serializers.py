@@ -15,10 +15,9 @@ class SignupSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        print("ye dekho: ", validated_data)
         email = validated_data.get("email")
         if not email:
-            raise serializers.ValidationError({"email": "This field is required."})
+            raise serializers.ValidationError({"message": "Email is required."})
         username_base = slugify(email.split('@')[0])
         user = UserModel.objects.create_user(
             email = email,
@@ -29,6 +28,20 @@ class SignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserModel
         fields = ("id", "email", "password")
+
+    def to_representation(self, instance):
+        """
+        Customize error representation for email and password fields
+        to return them as strings instead of arrays.
+        """
+        representation = super().to_representation(instance)
+        errors = self.errors
+        if errors:
+            formatted_errors = {}
+            for field, error in errors.items():
+                formatted_errors[field] = ', '.join(error)  # Join errors as a string
+            return {"message": "Validation failed", "errors": formatted_errors}
+        return representation
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -63,17 +76,23 @@ class MembershipPlanSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class MembershipSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    plan = MembershipPlanSerializer(read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+    price = serializers.DecimalField(source="plan.price", max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Membership
-        fields = '__all__'
+        fields = ['id', 'user_email', 'plan', 'plan_name', 'price', 'start_date', 'end_date', 'is_active']
+
 
 class PaymentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    membership = MembershipSerializer(read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    membership_plan = serializers.CharField(source="membership.plan.name", read_only=True)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    transaction_id = serializers.CharField(read_only=True)
+    status = serializers.ChoiceField(choices=[("pending", "Pending"), ("success", "Success"), ("failed", "Failed")])
 
     class Meta:
         model = Payment
-        fields = '__all__'
+        fields = ['id', 'user_email', 'membership', 'membership_plan', 'amount', 'transaction_id', 'status', 'payment_method', 'created_at']
+

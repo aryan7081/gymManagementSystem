@@ -5,6 +5,7 @@ from rest_framework.generics import CreateAPIView
 from .serializers import SignupSerializer, LoginSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework import status
 from .models import MembershipPlan, Membership, Payment
@@ -17,6 +18,7 @@ from datetime import timedelta  # To calculate membership duration
 from rest_framework import viewsets, status  # DRF viewsets & status codes
 from rest_framework.response import Response  # DRF response handling
 from rest_framework.permissions import IsAuthenticated 
+import uuid
 
 class SignupView(CreateAPIView):
     serializer_class = SignupSerializer
@@ -29,7 +31,17 @@ class SignupView(CreateAPIView):
                 "email": user.email,
                 "message": "User created successfully"
             }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        errors = serializer.errors
+        formatted_errors = {}
+
+        # Format each field error as a string
+        for field, error_messages in errors.items():
+            formatted_errors[field] = ' '.join(error_messages)
+
+        return Response({
+            "message": "Validation failed",
+            "errors": formatted_errors  # Send the errors as strings
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginApiView(APIView):
     def post(self, request):
@@ -43,6 +55,14 @@ class LoginApiView(APIView):
                 "email": user.email
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class LogoutView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated] 
+
+    def post(self, request):
+        request.auth.delete() 
+        return Response({"message": "Logged out successfully"}, status=200)
 
 # ✅ Membership Plan Viewset (CRUD)
 class MembershipPlanViewSet(viewsets.ModelViewSet):
@@ -74,6 +94,7 @@ class MembershipViewSet(viewsets.ModelViewSet):
 
         if not created:
             # Extend existing membership
+            membership.plan = plan
             membership.end_date += timedelta(days=plan.get_duration_days())
             membership.is_active = True
             membership.save()
@@ -97,12 +118,36 @@ class PaymentViewSet(viewsets.ModelViewSet):
         except Membership.DoesNotExist:
             return Response({"error": "Invalid membership"}, status=status.HTTP_400_BAD_REQUEST)
 
+        transaction_id = str(uuid.uuid4())
         payment = Payment.objects.create(
             user=user,
             membership=membership,
             amount=amount,
             payment_method=payment_method,
-            status="pending"
+            transaction_id=transaction_id,
+            status="success"
         )
+        membership.is_active = True
+        membership.save()
 
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+    
+
+class MembershipStatusView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        membership = Membership.objects.filter(user=user, is_active=True).first()
+
+        if membership:
+            return Response({
+                "has_membership": True,
+                "membership_plan": membership.plan.name,
+                "start_date": membership.start_date,
+                "end_date": membership.end_date,
+                "is_active": membership.is_active
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({"has_membership": False, "message": "No active membership found."}, status=status.HTTP_200_OK)
