@@ -9,6 +9,8 @@ UserModel = get_user_model()
 class SignupSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only = True, min_length=8)
+    full_name = serializers.CharField(required=False, allow_blank=True)
+    profile_photo = serializers.ImageField(required=False, allow_null=True)
     def validate_email(self, value):
         if UserModel.objects.filter(email = value).exists():
             raise serializers.ValidationError("A user with this email already exist")
@@ -16,18 +18,22 @@ class SignupSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         email = validated_data.get("email")
+        full_name = validated_data.get("full_name", "")
+        profile_photo = validated_data.get("profile_photo", None)
         if not email:
             raise serializers.ValidationError({"message": "Email is required."})
         username_base = slugify(email.split('@')[0])
         user = UserModel.objects.create_user(
             email = email,
             username = username_base,
-            password=validated_data['password']
+            password=validated_data['password'],
+            full_name=full_name,
+            profile_photo=profile_photo 
         )
         return user
     class Meta:
         model = UserModel
-        fields = ("id", "email", "password")
+        fields = ("id", "email", "password", "full_name", "profile_photo")
 
     def to_representation(self, instance):
         """

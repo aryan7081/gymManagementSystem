@@ -24,10 +24,15 @@ admin_site.register(MembershipPlan, MembershipPlanAdmin)
 
 
 class MembershipAdmin(admin.ModelAdmin):
-    list_display = ('user', 'plan', 'start_date', 'end_date', 'is_active')
-    search_fields = ('user__username', 'plan__name')
+    list_display = ('get_full_name', 'plan', 'start_date', 'end_date', 'is_active')
+    search_fields = ('user__full_name', 'plan__name')
     list_filter = ('is_active', 'plan')
     ordering = ('-start_date',)
+
+    def get_full_name(self, obj):
+        return obj.user.full_name or obj.user.username
+    get_full_name.short_description = 'Full Name'
+    get_full_name.admin_order_field = 'user__full_name'
 
 admin_site.register(Membership, MembershipAdmin)
 

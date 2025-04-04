@@ -7,6 +7,7 @@ class CustomUser(AbstractUser):
     username = models.CharField(max_length = 150, unique = True)
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length = 255, null = True, blank = True)
+    profile_photo = models.ImageField(upload_to='profile_photos/', null=True, blank=True)
     contact_number = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField( default=now)
     updated_at = models.DateTimeField(auto_now=True)

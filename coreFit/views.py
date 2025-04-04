@@ -29,6 +29,7 @@ class SignupView(CreateAPIView):
             return Response({
                 "id": user.id,
                 "email": user.email,
+                "name": user.full_name,
                 "message": "User created successfully"
             }, status=status.HTTP_200_OK)
         errors = serializer.errors
@@ -52,6 +53,7 @@ class LoginApiView(APIView):
             return Response({
                 "token": token.key,
                 "user_id": user.id,
+                "name": user.full_name,
                 "email": user.email
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
