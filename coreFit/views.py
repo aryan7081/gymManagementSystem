@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .models import CustomUser
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from rest_framework.generics import CreateAPIView
 from .serializers import SignupSerializer, LoginSerializer
 from rest_framework.response import Response
@@ -11,10 +11,13 @@ from rest_framework import status
 from .models import MembershipPlan, Membership, Payment
 from .serializers import MembershipPlanSerializer, MembershipSerializer, PaymentSerializer
 from django.urls import path, include
+from django.views.decorators.csrf import csrf_exempt
+import json
 from rest_framework.routers import DefaultRouter
 from django.utils.timezone import now  # To handle datetime operations
 from datetime import timedelta  # To calculate membership duration
-
+import razorpay
+from django.conf import settings
 from rest_framework import viewsets, status  # DRF viewsets & status codes
 from rest_framework.response import Response  # DRF response handling
 from rest_framework.permissions import IsAuthenticated 
@@ -91,14 +94,14 @@ class MembershipViewSet(viewsets.ModelViewSet):
             "plan": plan,
             "start_date": now().date(),
             "end_date": now().date() + timedelta(days=plan.get_duration_days()),
-            "is_active": True
+            "is_active": False
         })
 
         if not created:
             # Extend existing membership
             membership.plan = plan
             membership.end_date += timedelta(days=plan.get_duration_days())
-            membership.is_active = True
+            membership.is_active = False
             membership.save()
 
         return Response(MembershipSerializer(membership).data, status=status.HTTP_201_CREATED)
@@ -112,7 +115,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         user = request.user
         membership_id = request.data.get("membership_id")
-        amount = request.data.get("amount")
+        amount = int(float(request.data.get("amount")) * 100)
         payment_method = request.data.get("payment_method")
         
         try:
@@ -121,18 +124,61 @@ class PaymentViewSet(viewsets.ModelViewSet):
             return Response({"error": "Invalid membership"}, status=status.HTTP_400_BAD_REQUEST)
 
         transaction_id = str(uuid.uuid4())
+
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        razorpay_order = client.order.create({
+            "amount": amount,
+            "currency": "INR",
+            "payment_capture": "1"
+        })
+
+
         payment = Payment.objects.create(
             user=user,
             membership=membership,
-            amount=amount,
+            amount=amount/100,
             payment_method=payment_method,
             transaction_id=transaction_id,
-            status="success"
+            status="pending"
         )
-        membership.is_active = True
-        membership.save()
 
-        return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+        return Response({
+            "razorpay_order_id": razorpay_order["id"],
+            "razorpay_key": settings.RAZORPAY_KEY_ID,
+            "amount": amount,
+            "currency": "INR",
+            "transaction_id": transaction_id
+        }, status=status.HTTP_201_CREATED)
+    
+@csrf_exempt
+def verify_payment(request):
+    if request.method == "POST":
+        
+
+        try:
+            data = json.loads(request.body)
+            params_dict = {
+                "razorpay_order_id": data.get("razorpay_order_id"),
+                "razorpay_payment_id": data.get("razorpay_payment_id"),
+                "razorpay_signature": data.get("razorpay_signature"),
+            }
+
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            client.utility.verify_payment_signature(params_dict)
+            
+            # Update payment status in DB
+            payment = Payment.objects.get(transaction_id=data.get("transaction_id"))
+            payment.status = "success"
+            payment.payment_method = data.get("payment_method", "upi")
+            payment.save()
+
+            # Activate membership
+            payment.membership.is_active = True
+            payment.membership.save()
+
+            return JsonResponse({"message": "Payment verified successfully"}, status=status.HTTP_200_OK)
+        except:
+            return JsonResponse({"error": "Invalid payment signature"}, status=status.HTTP_400_BAD_REQUEST)
     
 
 class MembershipStatusView(APIView):

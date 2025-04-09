@@ -49,8 +49,13 @@ class Membership(models.Model):
     end_date = models.DateField()
     is_active = models.BooleanField(default=False)
 
+    # def __str__(self):
+    #     return f"{self.user.username} - {self.plan.name} (Active: {self.is_active})"
+    
     def __str__(self):
-        return f"{self.user.username} - {self.plan.name} (Active: {self.is_active})"
+        plan_name = self.plan.name if self.plan else "No plan"
+        return f"{self.user.username} - {plan_name} (Active: {self.is_active})"
+
     
 class Payment(models.Model):
     STATUS_CHOICES = [
