@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser, Payment, Membership,MembershipPlan
+from .models import CustomUser, Payment, Membership,MembershipPlan, MembershipFeature
 from django.contrib.admin import AdminSite
 from .forms import CustomAdminAuthenticationForm
 from django.contrib.auth.models import Group
@@ -16,11 +16,13 @@ admin_site.register(Token)
 admin_site.register(CustomUser)
 
 class MembershipPlanAdmin(admin.ModelAdmin):
-    list_display = ('name', 'duration', 'price', 'is_active', 'created_at')
+    list_display = ('name', 'duration', 'price', 'is_active', 'created_at', 'popular')
+    filter_horizontal = ('features',)
     search_fields = ('name',)
     list_filter = ('is_active', 'duration')
     ordering = ('-created_at',)
 admin_site.register(MembershipPlan, MembershipPlanAdmin)
+admin_site.register(MembershipFeature)
 
 
 class MembershipAdmin(admin.ModelAdmin):
