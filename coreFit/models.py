@@ -12,6 +12,13 @@ class CustomUser(AbstractUser):
     created_at = models.DateTimeField( default=now)
     updated_at = models.DateTimeField(auto_now=True)
 
+
+class MembershipFeature(models.Model):
+    name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
 class MembershipPlan(models.Model):
     PLAN_CHOICES = [
         ('monthly', 'Monthly'),
@@ -24,6 +31,8 @@ class MembershipPlan(models.Model):
     duration = models.CharField(max_length=100, choices = PLAN_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places = 2)
     description = models.TextField(blank = True, null = True)
+    features = models.ManyToManyField(MembershipFeature, blank=True)
+    popular = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -40,6 +49,7 @@ class MembershipPlan(models.Model):
             'annual': 365,
         }
         return duration_map.get(self.duration, 30)
+
     
 
 class Membership(models.Model):

@@ -77,9 +77,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'username', 'full_name', 'contact_number']
 
 class MembershipPlanSerializer(serializers.ModelSerializer):
+    features = serializers.StringRelatedField(many=True)
     class Meta:
         model = MembershipPlan
-        fields = '__all__'
+        fields = ['id', 'name', 'price', 'duration', 'description', 'popular', 'features']
 
 class MembershipSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
